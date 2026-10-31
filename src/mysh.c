@@ -3,12 +3,19 @@
 int main(int argc, char const *argv[]) {
     int status = 0;
     int in_fd = STDIN_FILENO;
+    size_t cmd_idx;
     ssize_t bytes;
     Mode mode;
     char read_buf[BUFFER_SIZE];
-    char line_buf[BUFFER_SIZE];
+    char cmd_buf[BUFFER_SIZE];
+    const char *home = getenv("HOME");
+    if (!home) {
+        perror("HOME env:");
+        status = 1;
+        goto cleanup;
+    }
     char cwd[PATH_MAX];
-    if (get_cwd(cwd) != 0) {
+    if (get_cwd(cwd, home) != 0) {
         perror("get_cwd error");
         status = 1;
         goto cleanup;
@@ -35,10 +42,17 @@ int main(int argc, char const *argv[]) {
         if (mode == INTERACTIVE) {
             fprintf(stderr, "%s$ ", cwd);
         }
-
         while ((bytes = read(in_fd, read_buf, BUFFER_SIZE)) > 0) {
             for (size_t i = 0; i < bytes; i++) {
-                char c = read_buf[i];
+                // Execute command
+                if (read_buf[i] == '\n') {
+                    cmd_buf[cmd_idx] = '\0';
+                    exec(cmd_buf);
+                    cmd_idx = 0;
+                    continue;
+                }
+
+                cmd_buf[cmd_idx++] = read_buf[i];
             }
         }
     }
@@ -58,11 +72,10 @@ cleanup:
     return status;
 }
 
-int get_cwd(char *cwd) {
-    const char *home = getenv("HOME");
+int get_cwd(char *cwd, const char *home) {
     getcwd(cwd, PATH_MAX);
 
-    if (!home || !cwd) {
+    if (!cwd) {
         return 1;
     }
 
@@ -81,3 +94,5 @@ int get_cwd(char *cwd) {
 
     return 0;
 }
+
+int exec(char *cmd_buf) {}

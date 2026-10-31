@@ -5,8 +5,10 @@
 #include <string.h>
 #include <unistd.h>
 
-#define BUFFER_SIZE 1024
+#define BUFFER_SIZE 4096
 
 typedef enum { INTERACTIVE, BATCH } Mode;
 
-int get_cwd(char *cwd);
+int get_cwd(char *cwd, const char *home);
+
+int exec(char *cmd_buf);
