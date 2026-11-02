@@ -1,3 +1,4 @@
+#define _DEFAULT_SOURCE
 #include <fcntl.h>
 #include <limits.h>
 #include <stdio.h>
