@@ -107,6 +107,11 @@ int get_cwd(char *cwd) {
     return 0;
 }
 
+/*
+ * Converts whole lines into a list of tokens
+ * Input: shell buffer
+ * Output: argc and modifies argv into a list of tokens
+ */
 int parse_args(char *cmd_buf, char **argv) {
     int argc = 0;
     char *token = strtok(cmd_buf, " ");
@@ -119,7 +124,49 @@ int parse_args(char *cmd_buf, char **argv) {
     return argc;
 }
 
-int exec(int argc, char **argv) {
+/*
+ * Converts wildcards into their matching patterns
+ * Input: list of tokens (argv)
+ * Output: list of tokens (argv) but with wildcards filled in
+ */
+int wildcard_setup(char **argv){
+    return 1;
+}
+
+/*
+ * Converts the list of tokens into a list of commands that can be run sequentially
+ * Input: list of tokens (argv)
+ * Output: list of command structures
+ */
+int cmdlist_setup(Command *cmd_list, char **argv){
+    return 1;
+}
+
+/*
+ * Checks if a command is built in (needed for redirection vs. basic)
+ * Input: argument list
+ * Output: 1 if true, 0 if false
+ */
+int is_builtin(char **argv){
+    if (strcmp(argv[0], "cd") == 0) {
+       return 1;
+    } else if (strcmp(argv[0], "pwd") == 0) {
+        return 1;
+    } else if (strcmp(argv[0], "which") == 0) {
+        return 1;
+    } else if (strcmp(argv[0], "exit") == 0) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+/*
+ * Runs built in commands
+ * Input: # of args and args list
+ * Output: 0 if complete, -1 if error
+ */
+int exec_builtin(int argc, char **argv) {
     if (strcmp(argv[0], "cd") == 0) {
         char *path = home;
         if (argc > 1) {
@@ -133,12 +180,10 @@ int exec(int argc, char **argv) {
     } else if (strcmp(argv[0], "pwd") == 0) {
         char cwd[PATH_MAX];
         getcwd(cwd, PATH_MAX);
-
         if (cwd == NULL) {
             perror("pwd failed");
             return -1;
         }
-
         fprintf(stderr, "%s", cwd);
     } else if (strcmp(argv[0], "which") == 0) {
         // to be implemented...
