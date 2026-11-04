@@ -52,7 +52,7 @@ int main(int argc, char const *argv[]) {
                     cmd_buf[cmd_idx] = '\0';
                     char *argv[MAX_ARGS];
                     int argc = parse_args(cmd_buf, argv);
-                    if (argc > 0) {
+                    if (argc > 0) { 
                         int r = exec(argc, argv);
                         if (r < 0) {
                             status = 1;

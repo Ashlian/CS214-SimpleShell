@@ -10,8 +10,15 @@
 #define MAX_ARGS 128
 
 typedef enum { INTERACTIVE, BATCH } Mode;
+typedef struct{
+    char **argv;
+    char *infile;
+    char *outfile;
+} Command;
 
 int get_cwd(char *cwd);
 int parse_args(char *cmd_buf, char **argv);
+int wildcard_setup(char **argv);
+int cmdlist_setup(Command* cmd_list, char **argv);
 
 int exec(int argc, char **argv);
