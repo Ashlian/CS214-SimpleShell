@@ -19,9 +19,8 @@ typedef struct{
 } Command;
 
 int get_cwd(char *cwd);
-int parse_args(char *cmd_buf, char **argv);
-int wildcard_setup(char **argv);
-int cmdlist_setup(Command* cmd_list, char **argv);
+int parse_args(char *cmd_buf, Command *cmd_list);
 
 int is_builtin(char **argv);
 int exec_builtin(int argc, char **argv);
+

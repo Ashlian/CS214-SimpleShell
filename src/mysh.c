@@ -50,8 +50,9 @@ int main(int argc, char const *argv[]) {
                 // Execute command
                 if (read_buf[i] == '\n') {
                     cmd_buf[cmd_idx] = '\0';
-                    char *argv[MAX_ARGS];
-                    int argc = parse_args(cmd_buf, argv);
+                    // char *argv[MAX_ARGS];
+                    Command *cmd_list;
+                    int argc = parse_args(cmd_buf, cmd_list);
                     if (argc > 0) { 
                         int r = exec(argc, argv);
                         if (r < 0) {
@@ -110,37 +111,47 @@ int get_cwd(char *cwd) {
 /*
  * Converts whole lines into a list of tokens
  * Input: shell buffer
- * Output: argc and modifies argv into a list of tokens
+ * Output: number of commands and the full command list
  */
-int parse_args(char *cmd_buf, char **argv) {
-    int argc = 0;
-    char *token = strtok(cmd_buf, " ");
+int parse_args(char *cmd_buf, Command *command_list) {
+    // tokenize with whitespace
+    size_t max = strlen(cmd_buf) / 2 + 1;
+    char **tokens = malloc((max+1) * sizeof(char *));
+    if (!tokens) {
+        perror("token_init failed");
+        return -1;
 
-    while (token != NULL && argc < MAX_ARGS - 1) {
-        argv[argc++] = token;
-        token = strtok(NULL, " ");
+    }
+    int ntokens = 0;
+    for (char *t = strtok(cmd_buf, " \t\n"); t != NULL, t = strtok(NULL, " \t\n");) {
+        tokens[ntokens++] = t;
+    }
+    if (ntokens == 0) { 
+        free(tokens);
+        return 0;
+    }
+    tokens[ntokens] = NULL;
+    // initialize command list
+    int ncmds = 1;
+    for (int i = 0; i < ntokens; i++) {
+        if (strcmp(tokens[i], "|") == 0) {
+            ncmds++;
+        }
+    }
+    command_list = calloc(ncmds, sizeof(Command));
+
+
+    for (int i = 0; i < ntokens; i++) {
+        // check for pipe "|"
+        // check for redirection "<", ">", ">>"
+        // check for '*' wildcard
+        // check for NULL terminator
+        // everything else 
     }
 
-    return argc;
+    return ncmds;
 }
 
-/*
- * Converts wildcards into their matching patterns
- * Input: list of tokens (argv)
- * Output: list of tokens (argv) but with wildcards filled in
- */
-int wildcard_setup(char **argv){
-    return 1;
-}
-
-/*
- * Converts the list of tokens into a list of commands that can be run sequentially
- * Input: list of tokens (argv)
- * Output: list of command structures
- */
-int cmdlist_setup(Command *cmd_list, char **argv){
-    return 1;
-}
 
 /*
  * Checks if a command is built in (needed for redirection vs. basic)
