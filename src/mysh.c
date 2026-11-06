@@ -113,7 +113,7 @@ int get_cwd(char *cwd) {
  * Input: shell buffer
  * Output: number of commands and the full command list
  */
-int parse_args(char *cmd_buf, Command *command_list) {
+int parse_args(char *cmd_buf, Command *cmd_list) {
     // tokenize with whitespace
     size_t max = strlen(cmd_buf) / 2 + 1;
     char **tokens = malloc((max+1) * sizeof(char *));
@@ -138,17 +138,55 @@ int parse_args(char *cmd_buf, Command *command_list) {
             ncmds++;
         }
     }
-    command_list = calloc(ncmds, sizeof(Command));
+    cmd_list = calloc(ncmds, sizeof(Command));
 
-
-    for (int i = 0; i < ntokens; i++) {
+    int c = 0;
+    for (int i = 0; i < ntokens - 1; i++) {
+        char *tok = tokens[i];
+        char *star = strchr(tok, '*');
         // check for pipe "|"
+        if (strcmp(tok, "|") == 0) {
+            if (cmd_list[c].argc == 0) {
+                // syntax error handler
+            }
+            c++;
+            continue;
+        }
         // check for redirection "<", ">", ">>"
+        else if (strcmp(tok, "<") == 0) {
+            if (tokens[i + 1] == NULL || is_special(tokens[i + 1])) {
+                // syntax error handler
+            }
+            cmd_list[c].infile = tokens[i + 1];
+            i++;
+            continue;
+        }
+        else if (strcmp(tok, ">") == 0 || strcmp(tok, ">>") == 0) {
+            if (tokens[i + 1] == NULL || is_special(tokens[i + 1])) {
+                // syntax error handler
+            }
+            cmd_list[c].outfile = tokens[i + 1];
+            cmd_list[c].append = (strcmp(tok, ">>") == 0);
+            i++;
+            continue;
+        }
         // check for '*' wildcard
-        // check for NULL terminator
-        // everything else 
-    }
+        else if (star != NULL) {
 
+        }
+        // everything else 
+        else {
+            if(cmd_list[c].argc >= MAX_ARGS) {
+                fprintf(stderr, "mysh: too many arugments\n");
+                // syntax error handler
+            }
+            cmd_list[c].argv[cmd_list[c].argc++] = tok;
+        }
+    }
+    
+    if (cmd_list[c].argc == 0) {
+        // syntax error handler
+    }
     return ncmds;
 }
 
@@ -205,4 +243,8 @@ int exec_builtin(int argc, char **argv) {
         return -1;
     }
     return 0;
+}
+
+int is_special(char *tok) {
+    return ((strcmp(tok, "|") == 0) || (strcmp(tok, "<") == 0) || (strcmp(tok, ">") == 0) || (strcmp(tok, ">>") == 0));
 }
