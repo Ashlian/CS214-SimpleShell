@@ -25,4 +25,6 @@ int is_builtin(char **argv);
 int is_special(char *tok);
 int exec_builtin(int argc, char **argv);
 
+void free_cmds(Command *cmd_list, int ncmds);
+
 

@@ -119,6 +119,7 @@ int parse_args(char *cmd_buf, Command *cmd_list) {
     char **tokens = malloc((max+1) * sizeof(char *));
     if (!tokens) {
         perror("token_init failed");
+        free(tokens);
         return -1;
 
     }
@@ -148,6 +149,7 @@ int parse_args(char *cmd_buf, Command *cmd_list) {
         if (strcmp(tok, "|") == 0) {
             if (cmd_list[c].argc == 0) {
                 // syntax error handler
+                goto syntax_error;
             }
             c++;
             continue;
@@ -156,6 +158,7 @@ int parse_args(char *cmd_buf, Command *cmd_list) {
         else if (strcmp(tok, "<") == 0) {
             if (tokens[i + 1] == NULL || is_special(tokens[i + 1])) {
                 // syntax error handler
+                goto syntax_error;
             }
             cmd_list[c].infile = tokens[i + 1];
             i++;
@@ -164,6 +167,7 @@ int parse_args(char *cmd_buf, Command *cmd_list) {
         else if (strcmp(tok, ">") == 0 || strcmp(tok, ">>") == 0) {
             if (tokens[i + 1] == NULL || is_special(tokens[i + 1])) {
                 // syntax error handler
+                goto syntax_error;
             }
             cmd_list[c].outfile = tokens[i + 1];
             cmd_list[c].append = (strcmp(tok, ">>") == 0);
@@ -178,18 +182,38 @@ int parse_args(char *cmd_buf, Command *cmd_list) {
         else {
             if(cmd_list[c].argc >= MAX_ARGS) {
                 fprintf(stderr, "mysh: too many arugments\n");
-                // syntax error handler
+                free(tokens);
+                free_cmds(cmd_list, ncmds);
+                return -1;
             }
-            cmd_list[c].argv[cmd_list[c].argc++] = tok;
+            cmd_list[c].argv[cmd_list[c].argc++] = strdup(tok);
         }
     }
     
     if (cmd_list[c].argc == 0) {
         // syntax error handler
+        goto syntax_error;
     }
     return ncmds;
+
+syntax_error:
+    fprintf(stderr, "mysh: syntax error\n");
+    free(tokens);
+    free_cmds(cmd_list, ncmds);
+    return -1;
 }
 
+
+void free_cmds(Command *cmd_list, int ncmds) {
+    if (cmd_list == NULL) return;
+
+    for (int c = 0; c < ncmds; c++) {
+        for(int a = 0; a < cmd_list[c].argc; a++) {
+            free(cmd_list[c].argv[a]);
+        }
+    }
+    free(cmd_list);
+}
 
 /*
  * Checks if a command is built in (needed for redirection vs. basic)
