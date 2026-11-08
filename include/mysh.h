@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <dirent.h>
 
 #define BUFFER_SIZE 4096
 #define MAX_ARGS 256
@@ -20,6 +21,8 @@ typedef struct{
 
 int get_cwd(char *cwd);
 int parse_args(char *cmd_buf, Command *cmd_list);
+int check_match(char *name, char *prefix, size_t prefix_len, char *suffix);
+int expand_wildcards(Command *cmd, char *tok);
 
 int is_builtin(char **argv);
 int is_special(char *tok);

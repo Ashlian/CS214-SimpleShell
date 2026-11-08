@@ -181,10 +181,7 @@ int parse_args(char *cmd_buf, Command *cmd_list) {
         // everything else 
         else {
             if(cmd_list[c].argc >= MAX_ARGS) {
-                fprintf(stderr, "mysh: too many arugments\n");
-                free(tokens);
-                free_cmds(cmd_list, ncmds);
-                return -1;
+                goto too_many_args;
             }
             cmd_list[c].argv[cmd_list[c].argc++] = strdup(tok);
         }
@@ -201,8 +198,21 @@ syntax_error:
     free(tokens);
     free_cmds(cmd_list, ncmds);
     return -1;
+
+too_many_args:
+    fprintf(stderr, "mysh: too many arugments\n");
+    free(tokens);
+    free_cmds(cmd_list, ncmds);
+    return -1;
 }
 
+int check_match(char *name, char *prefix, size_t prefix_len, char *suffix) {
+
+}
+
+int expand_wildcards(Command *cmd, char *tok) {
+    
+}
 
 void free_cmds(Command *cmd_list, int ncmds) {
     if (cmd_list == NULL) return;
