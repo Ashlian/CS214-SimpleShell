@@ -64,15 +64,70 @@ int main(int argc, char const *argv[]) {
                     }
 
                     // Run through the cmds - check whether a path is given or not
+                    pid_t last_pid;
                     for(int i = 0; i < ncmds; i++) {
                         Command curr_cmd = cmd_list[i];
-                        // Check if cmd gets redirected using infile and outfile flags
+                        char *path; 
+                        //! IMPORTANT - SEARCH FOR PATH OF FILE IF NO PATH IS GIVEN (/usr/localbin, /usr/bin, /bin with access())
 
-                        // Check if cmd is piped using the position of the cmd in the cmd_list
+                        pid_t pid;
+                        if ((pid = fork()) == 0) {
+                            last_pid = pid;
+                            if (mode == BATCH) {
+                                int devnull = open("/dev/null", O_RDONLY);
+                                if (devnull < 0) {
+                                    perror("/dev/null");
+                                    exit(EXIT_FAILURE);
+                                }
+                                dup2(devnull, STDIN_FILENO);
+                                close(devnull);
+                            }
+                            // ! Check if cmd is piped using the position of the cmd in the cmd_list
+                            if (ncmds >= 2) {
 
-                        // Regular case
+                            }
+                            // Check if cmd gets redirected using infile and outfile flags
+                            else if (curr_cmd.infile || curr_cmd.outfile) {
+                                // input redirection
+                                if (curr_cmd.infile) { 
+                                    int input_fd = open(curr_cmd.infile, O_RDONLY);
+                                    if (input_fd < 0) {
+                                        perror(curr_cmd.infile);
+                                        exit(EXIT_FAILURE);
+                                    }
+                                    dup2(input_fd, STDIN_FILENO);
+                                    close(input_fd);
+                                }
+                                // output redireection
+                                if (curr_cmd.outfile) { 
+                                    int flags = O_WRONLY | O_CREAT | (curr_cmd.append ? O_APPEND : O_TRUNC);
+                                    int output_fd = open(curr_cmd.outfile, flags, 0640);
+                                    if (output_fd < 0) {
+                                        perror(curr_cmd.outfile);
+                                        exit(EXIT_FAILURE);
+                                    }
+                                    dup2(output_fd, STDOUT_FILENO);
+                                    close(output_fd);
+                                }
+                            }
+
+                            //! CHECK BUILT IN COMMAND TO RUN BEFORE RUNNING EXECV
+                            execv(path, curr_cmd.argv);
+                            perror(path);
+                            exit(EXIT_FAILURE);
+                        }
+                        // ! PARENT CLOSE ALL PIPE ENDS HERE
                     }
-                    
+                    //! CHECK STATUS OF LAST COMMAND FROM CHILD PROCESS AND PRINT IF WHAT STATUS IT WAS EXITED IF IT FAILED AND IF SHELL IS IN INTERACTIVE
+                    int last_status;
+                    int pid_status;
+                    for (int i = 0; i < ncmds; i++) {
+                        pid_t done = wait(&pid_status);
+                        if (done == last_pid) {
+                            last_status = pid_status;
+                        }
+                    }
+
                     cmd_idx = 0;
                     continue;
                 }
