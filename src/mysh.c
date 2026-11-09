@@ -50,10 +50,9 @@ int main(int argc, char const *argv[]) {
                 // Execute command
                 if (read_buf[i] == '\n') {
                     cmd_buf[cmd_idx] = '\0';
-                    // char *argv[MAX_ARGS];
                     Command *cmd_list;
-                    int argc = parse_args(cmd_buf, cmd_list);
-                    if (argc > 0) { 
+                    int ncmds = parse_args(cmd_buf, cmd_list);
+                    if (ncmds == 1 && is_builtin(cmd_list[0].argv) && cmd_list[0].infile == NULL && cmd_list[0].outfile == NULL) {
                         int r = exec(argc, argv);
                         if (r < 0) {
                             status = 1;
@@ -61,7 +60,19 @@ int main(int argc, char const *argv[]) {
                         } else if (r > 0) {
                             goto cleanup;
                         }
+                        continue; 
                     }
+
+                    // Run through the cmds - check whether a path is given or not
+                    for(int i = 0; i < ncmds; i++) {
+                        Command curr_cmd = cmd_list[i];
+                        // Check if cmd gets redirected using infile and outfile flags
+
+                        // Check if cmd is piped using the position of the cmd in the cmd_list
+
+                        // Regular case
+                    }
+                    
                     cmd_idx = 0;
                     continue;
                 }
