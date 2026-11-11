@@ -8,10 +8,9 @@ int main(int argc, char const *argv[]) {
     int status = 0;
     int exit_flag = 0;
     int in_fd = STDIN_FILENO;
+    Mode mode = BATCH;
     InputBuffer input = {0};
     char cmd_buf[BUFFER_SIZE];
-    // Set mode to interactive if ran from terminal and batch if ran from file.
-    Mode mode = isatty(in_fd) ? INTERACTIVE : BATCH;
 
     // Iniitalize home path
     home = getenv("HOME");
@@ -19,6 +18,11 @@ int main(int argc, char const *argv[]) {
         perror("HOME env:");
         status = 1;
         goto cleanup;
+    }
+
+    // Set mode to interactive if ran from terminal and batch if ran from file.
+    if (argc == 1 && isatty(STDIN_FILENO)) {
+        mode = INTERACTIVE;
     }
 
     // Read file of commands
@@ -64,7 +68,7 @@ int main(int argc, char const *argv[]) {
         // Execute command
         exec_commands(cmd_list, n_cmds, mode, &exit_flag);
         free_cmds(cmd_list, n_cmds);
-        if (exit_flag) { 
+        if (exit_flag) {
             break;
         }
         continue;
