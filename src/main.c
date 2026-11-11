@@ -2,6 +2,8 @@
 
 const char *home = NULL;
 
+static int get_cwd(char *cwd);
+
 int main(int argc, char const *argv[]) {
     int status = 0;
     int in_fd = STDIN_FILENO;
@@ -50,7 +52,7 @@ int main(int argc, char const *argv[]) {
                 if (read_buf[i] == '\n') {
                     cmd_buf[cmd_idx] = '\0';
                     Command *cmd_list = NULL;
-                    int n_cmds = parse_args(cmd_buf, cmd_list);
+                    int n_cmds = parse_args(cmd_buf, &cmd_list);
 
                     // Check if file is builtin
                     if (n_cmds == 1 && is_builtin(cmd_list[0].argv) && cmd_list[0].infile == NULL &&

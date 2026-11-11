@@ -93,3 +93,22 @@ int find_exec(const char *arg, char **exec_path) {
     fprintf(stderr, "find_exec: can not find executable");
     return -1;
 }
+
+/*
+ * Checks if a command is built in (needed for redirection vs. basic)
+ * Input: argument list
+ * Output: 1 if true, 0 if false
+ */
+int is_builtin(char **argv) {
+    if (strcmp(argv[0], "cd") == 0) {
+        return 1;
+    } else if (strcmp(argv[0], "pwd") == 0) {
+        return 1;
+    } else if (strcmp(argv[0], "which") == 0) {
+        return 1;
+    } else if (strcmp(argv[0], "exit") == 0) {
+        return 1;
+    } else {
+        return 0;
+    }
+}

@@ -1,5 +1,9 @@
 #include "mysh.h"
 
+static int is_special(char *tok);
+static int check_match(char *name, char *prefix, size_t prefix_len, char *suffix);
+static int expand_wildcards(Command *cmd, char *tok);
+
 /*
  * Converts whole lines into a list of tokens
  * Input: shell buffer
@@ -21,7 +25,6 @@ int parse_args(char *cmd_buf, Command **cmd_list) {
     char **tokens = malloc((max_tokens + 1) * sizeof(char *));
     if (!tokens) {
         perror("token_init");
-        free(tokens);
         return -1;
     }
 
@@ -126,7 +129,7 @@ error:
 /*
  * Returns 1 if name matches the pattern, 0 if not
  */
-int check_match(char *name, char *prefix, size_t prefix_len, char *suffix) {
+static int check_match(char *name, char *prefix, size_t prefix_len, char *suffix) {
     size_t name_len = strlen(name);
     size_t suffix_len = strlen(suffix);
     if (name_len < prefix_len + suffix_len) {
@@ -137,7 +140,12 @@ int check_match(char *name, char *prefix, size_t prefix_len, char *suffix) {
     return (strcmp(name + name_len - suffix_len, suffix) == 0);
 }
 
-int expand_wildcards(Command *cmd, char *tok) {
+static int is_special(char *tok) {
+    return ((strcmp(tok, "|") == 0) || (strcmp(tok, "<") == 0) || (strcmp(tok, ">") == 0) ||
+            (strcmp(tok, ">>") == 0));
+}
+
+static int expand_wildcards(Command *cmd, char *tok) {
     int status = -1;
     int matches_found = 0;
     char *dirpath = NULL;
@@ -241,9 +249,4 @@ void free_cmds(Command *cmds, int n_cmds) {
         free(cmds[c].outfile);
     }
     free(cmds);
-}
-
-int is_special(char *tok) {
-    return ((strcmp(tok, "|") == 0) || (strcmp(tok, "<") == 0) || (strcmp(tok, ">") == 0) ||
-            (strcmp(tok, ">>") == 0));
 }

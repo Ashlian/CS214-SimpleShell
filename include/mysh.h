@@ -29,10 +29,7 @@ extern const char *home;
 
 // Parser
 int parse_args(char *cmd_buf, Command **cmd_list);
-int expand_wildcards(Command *cmd, char *tok);
-int check_match(char *name, char *prefix, size_t prefix_len, char *suffix);
 void free_cmds(Command *cmds, int n_cmds);
-int is_special(char *tok);
 
 // Execution
 int exec_builtin(int argc, char **argv);
