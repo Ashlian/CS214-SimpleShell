@@ -7,7 +7,7 @@ static const size_t NUM_SEARCH_DIRS = sizeof(SEARCH_DIRS) / sizeof(SEARCH_DIRS[0
 int main(int argc, char const *argv[]) {
     int status = 0;
     int in_fd = STDIN_FILENO;
-    size_t cmd_idx;
+    size_t cmd_idx = 0;
     ssize_t bytes;
     Mode mode;
     char read_buf[BUFFER_SIZE];
