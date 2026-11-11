@@ -23,9 +23,17 @@ typedef struct {
     int argc;
     int append;
 } Command;
+typedef struct {
+    char buf[BUFFER_SIZE];
+    size_t pos;
+    size_t len;
+} InputBuffer;
 
 // Shared variables
 extern const char *home;
+
+// Reader
+int read_command(int fd, char *cmd_buf, InputBuffer *input);
 
 // Parser
 int parse_args(char *cmd_buf, Command **cmd_list);
