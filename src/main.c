@@ -170,7 +170,7 @@ cleanup:
     return status;
 }
 
-int get_cwd(char *cwd) {
+static int get_cwd(char *cwd) {
     size_t len = strlen(home);
     getcwd(cwd, PATH_MAX);
 
