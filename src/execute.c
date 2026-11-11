@@ -10,89 +10,162 @@ static int exec_parent_builtin(const Command *cmd);
 static int exec_builtin(int argc, char *const argv[]);
 
 int exec_commands(Command *cmd_list, int n_cmds, Mode mode, int *exit_flag) {
-    Command *cmd = &cmd_list[0];
+    Command *first_cmd = &cmd_list[0];
+
+    // Detect exit in pipeline from parent
+    for (int i = 0; i < n_cmds; i++) {
+        if (strcmp(cmd_list[i].argv[0], "exit") == 0) {
+            *exit_flag = 1;
+            break;
+        }
+    }
 
     // Run standalone built-in commands
-    if (n_cmds == 1 && is_builtin(cmd->argv)) {
-        int result = exec_parent_builtin(cmd);
-        if (result == 1) {
-            *exit_flag = 1;
-        }
+    if (n_cmds == 1 && is_builtin(first_cmd->argv)) {
+        return exec_parent_builtin(first_cmd);
     }
 
-    // Find executable
-    char *path = NULL;
-    //! IMPORTANT - SEARCH FOR PATH OF FILE IF NO PATH IS GIVEN (/usr/localbin, /usr/bin, /bin with
-    //! access())
-    if (!is_builtin(cmd->argv) && find_exec(cmd->argv[0], &path) < 0) {
-        free(path);
-        return -1;
-    }
+    fflush(stdout);
 
-    pid_t pid = fork();
-    if (pid < 0) {
-        perror("fork");
-        free(path);
-        return -1;
-    }
+    int prev_read = -1;
+    int n_started = 0;
+    size_t last_status = 0;
+    pid_t pids[n_cmds];
 
-    if (pid == 0) {
-        // Batch mode defaults to /dev/null stdin
-        if (mode == BATCH) {
-            int devnull = open("/dev/null", O_RDONLY);
-            if (devnull < 0) {
-                perror("/dev/null");
-                exit(EXIT_FAILURE);
-            }
+    for (size_t i = 0; i < n_cmds; i++) {
+        Command *cmd = &cmd_list[i];
+        int pipefd[2] = {-1, -1};
 
-            if (dup2(devnull, STDIN_FILENO) < 0) {
-                perror("dup2");
-                _exit(EXIT_FAILURE);
-            }
-
-            close(devnull);
-        }
-        // ! Check if cmd is piped using the position of the cmd in the cmd_list
-        if (n_cmds >= 2) {
-
-        }
-        // Check if cmd gets redirected using infile and outfile flags
-        else if (cmd->infile || cmd->outfile) {
-            if (setup_redirection(cmd) < 0) {
-                _exit(EXIT_FAILURE);
+        // Create pipe unless last command
+        if (i < n_cmds - 1) {
+            if (pipe(pipefd) < 0) {
+                perror("pipe");
+                break;
             }
         }
 
-        //! CHECK BUILT IN COMMAND TO RUN BEFORE RUNNING EXECV
-        if (is_builtin(cmd->argv)) {
-            int result = exec_builtin(cmd->argc, cmd->argv);
-            fflush(stdout);
-            if (result == 1) {
-                *exit_flag = 1;
-                exit(EXIT_SUCCESS);
+        pid_t pid = fork();
+
+        if (pid < 0) {
+            perror("fork");
+
+            if (pipefd[0] >= 0)
+                close(pipefd[0]);
+            if (pipefd[1] >= 0)
+                close(pipefd[1]);
+
+            break;
+        }
+
+        // Child Process
+        if (pid == 0) {
+            // Batch mode defaults to /dev/null stdin
+            if (i == 0 && (mode == BATCH || cmd->outfile || n_cmds > 1)) {
+                int devnull = open("/dev/null", O_RDONLY);
+                if (devnull < 0) {
+                    perror("/dev/null");
+                    _exit(EXIT_FAILURE);
+                }
+
+                if (dup2(devnull, STDIN_FILENO) < 0) {
+                    perror("dup2");
+                    _exit(EXIT_FAILURE);
+                }
+
+                close(devnull);
+            }
+            if (n_cmds > 1) {
+                // Read from previous pipe
+                if (prev_read >= 0) {
+                    if (dup2(prev_read, STDIN_FILENO) < 0) {
+                        perror("dup2");
+                        _exit(EXIT_FAILURE);
+                    }
+                }
+                // Write to the next pipe
+                if (pipefd[1] >= 0) {
+                    if (dup2(pipefd[1], STDOUT_FILENO) < 0) {
+                        perror("dup2");
+                        _exit(EXIT_FAILURE);
+                    }
+                }
             } else {
-                exit(result == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
+                if (setup_redirection(cmd) < 0) {
+                    _exit(EXIT_FAILURE);
+                }
             }
+
+            // Close descriptors
+            if (prev_read >= 0)
+                close(prev_read);
+            if (pipefd[0] >= 0)
+                close(pipefd[0]);
+            if (pipefd[1] >= 0)
+                close(pipefd[1]);
+
+            // Excute built-in
+            if (is_builtin(cmd->argv)) {
+                int result = exec_builtin(cmd->argc, cmd->argv);
+                fflush(stdout);
+                _exit(result >= 0 ? EXIT_SUCCESS : EXIT_FAILURE);
+            }
+
+            // Find execute external command
+            char *path = NULL;
+
+            if (find_exec(cmd->argv[0], &path) < 0) {
+                free(path);
+                _exit(EXIT_FAILURE);
+            }
+
+            execv(path, cmd->argv);
+            perror("execv");
+            free(path);
+            _exit(EXIT_FAILURE);
         }
-        execv(path, cmd->argv);
-        perror("execv");
-        exit(EXIT_FAILURE);
+
+        // Parent Process
+        pids[n_started++] = pid;
+
+        if (prev_read >= 0) {
+            close(prev_read);
+        }
+        if (pipefd[1] >= 0) {
+            close(pipefd[1]);
+        }
+
+        prev_read = pipefd[0];
     }
 
-    // Parent Process
-    free(path);
+    if (prev_read >= 0) {
+        close(prev_read);
+    }
 
-    //! CHECK STATUS OF LAST COMMAND FROM CHILD PROCESS AND PRINT IF WHAT STATUS IT
-    //! WAS EXITED IF IT FAILED AND IF SHELL IS IN INTERACTIVE
-    int status = 0;
-    if (waitpid(pid, &status, 0) < 0) {
-        perror("waitpid");
+    // Wait for child processes
+    int wait_errors = 0;
+
+    for (size_t i = 0; i < n_started; i++) {
+        int status = 0;
+
+        if (waitpid(pids[i], &status, 0) < 0) {
+            perror("waitpid");
+            wait_errors++;
+            continue;
+        }
+
+        if (i == n_cmds - 1) {
+            last_status = status;
+        }
+    }
+
+    // Check whether pipeline setup failed
+    if (n_started != n_cmds || wait_errors > 0) {
         return -1;
     }
 
     // Terminal by exit
-    if (WIFEXITED(status)) {
-        int code = WEXITSTATUS(status);
+    if (WIFEXITED(last_status)) {
+        int code = WEXITSTATUS(last_status);
         if (code != 0 && mode == INTERACTIVE) {
             fprintf(stderr, "Exited with status %d\n", code);
         }
@@ -101,9 +174,9 @@ int exec_commands(Command *cmd_list, int n_cmds, Mode mode, int *exit_flag) {
     }
 
     // Terminated by signal
-    if (WIFSIGNALED(status)) {
+    if (WIFSIGNALED(last_status)) {
         if (mode == INTERACTIVE) {
-            psignal(WTERMSIG(status), "Terminated");
+            psignal(WTERMSIG(last_status), "Terminated");
         }
     }
 
