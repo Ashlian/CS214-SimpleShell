@@ -1,6 +1,8 @@
 #include "mysh.h"
 
 static const char *home = NULL;
+static const char *SEARCH_DIRS[] = {"/usr/local/bin", "/usr/bin", "/bin"};
+static const size_t NUM_SEARCH_DIRS = sizeof(SEARCH_DIRS) / sizeof(SEARCH_DIRS[0]);
 
 int main(int argc, char const *argv[]) {
     int status = 0;
@@ -139,12 +141,12 @@ int main(int argc, char const *argv[]) {
                 cmd_buf[cmd_idx++] = read_buf[i];
             }
         }
-    }
 
-    if (bytes < 0) {
-        perror("Error reading:");
-        status = 1;
-        goto cleanup;
+        if (bytes < 0) {
+            perror("Error reading:");
+            status = 1;
+            goto cleanup;
+        }
     }
 
 cleanup:
@@ -412,21 +414,77 @@ int exec_builtin(int argc, char **argv) {
         }
     } else if (strcmp(argv[0], "pwd") == 0) {
         char cwd[PATH_MAX];
-        getcwd(cwd, PATH_MAX);
-        if (cwd == NULL) {
+
+        if (getcwd(cwd, PATH_MAX) == NULL) {
             perror("pwd failed");
             return -1;
         }
-        fprintf(stderr, "%s", cwd);
+
+        printf("%s\n", cwd);
     } else if (strcmp(argv[0], "which") == 0) {
-        // to be implemented...
+        char *exec_path = NULL;
+        size_t num_exec = 0;
+
+        for (size_t i = 1; i < argc; i++) {
+            if (find_exec(argv[i], &exec_path) == 0) {
+                printf("%s\n", exec_path);
+                num_exec++;
+            }
+        }
+
+        free(exec_path);
+
+        if (num_exec != argc - 1) {
+            fprintf(stderr, "No executables");
+            return -1;
+        }
     } else if (strcmp(argv[0], "exit") == 0) {
         return 1;
     } else {
-        perror("Invalid command");
+        fprintf(stderr, "Invalid command");
         return -1;
     }
+
     return 0;
+}
+
+int find_exec(const char *arg, char **exec_path) {
+    if (strchr(arg, '/') != NULL) {
+        if (access(arg, X_OK) == 0) {
+            char *temp = realloc(*exec_path, strlen(arg) + 1);
+            if (temp == NULL) {
+                return -1;
+            }
+
+            *exec_path = temp;
+            strcpy(*exec_path, arg);
+            return 0;
+        }
+        fprintf(stderr, "find_exec: path is not executable");
+        return -1;
+    }
+
+    for (size_t i = 0; i < NUM_SEARCH_DIRS; i++) {
+        size_t path_len = strlen(SEARCH_DIRS[i]) + strlen(arg) + 2;
+
+        char *temp = realloc(*exec_path, path_len);
+        if (temp == NULL) {
+            return -1;
+        }
+
+        *exec_path = temp;
+
+        strcpy(*exec_path, SEARCH_DIRS[i]);
+        strcat(*exec_path, "/");
+        strcat(*exec_path, arg);
+
+        if (access(*exec_path, X_OK) == 0) {
+            return 0;
+        }
+    }
+
+    fprintf(stderr, "find_exec: can not find executable");
+    return -1;
 }
 
 int is_special(char *tok) {
