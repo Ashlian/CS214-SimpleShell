@@ -5,14 +5,16 @@ static const size_t NUM_SEARCH_DIRS = sizeof(SEARCH_DIRS) / sizeof(SEARCH_DIRS[0
 
 static int is_builtin(char **argv);
 static int find_exec(const char *arg, char **exec_path);
-static int exec_builtin(int argc, char **argv);
+static int setup_redirection(const Command *cmd);
+static int exec_parent_builtin(const Command *cmd);
+static int exec_builtin(int argc, char *const argv[]);
 
 int exec_commands(Command *cmd_list, int n_cmds, Mode mode, int *exit_flag) {
     Command *cmd = &cmd_list[0];
 
     // Run standalone built-in commands
-    if (n_cmds == 1 && is_builtin(cmd->argv) && cmd->infile == NULL && cmd->outfile == NULL) {
-        int result = exec_builtin(cmd->argc, cmd->argv);
+    if (n_cmds == 1 && is_builtin(cmd->argv)) {
+        int result = exec_parent_builtin(cmd);
         if (result == 1) {
             *exit_flag = 1;
         }
@@ -56,37 +58,19 @@ int exec_commands(Command *cmd_list, int n_cmds, Mode mode, int *exit_flag) {
         }
         // Check if cmd gets redirected using infile and outfile flags
         else if (cmd->infile || cmd->outfile) {
-            // input redirection
-            if (cmd->infile) {
-                int input_fd = open(cmd->infile, O_RDONLY);
-                if (input_fd < 0) {
-                    perror(cmd->infile);
-                    exit(EXIT_FAILURE);
-                }
-                dup2(input_fd, STDIN_FILENO);
-                close(input_fd);
-            }
-            // output redireection
-            if (cmd->outfile) {
-                int flags = O_WRONLY | O_CREAT | (cmd->append ? O_APPEND : O_TRUNC);
-                int output_fd = open(cmd->outfile, flags, 0640);
-                if (output_fd < 0) {
-                    perror(cmd->outfile);
-                    exit(EXIT_FAILURE);
-                }
-                dup2(output_fd, STDOUT_FILENO);
-                close(output_fd);
+            if (setup_redirection(cmd) < 0) {
+                _exit(EXIT_FAILURE);
             }
         }
 
         //! CHECK BUILT IN COMMAND TO RUN BEFORE RUNNING EXECV
         if (is_builtin(cmd->argv)) {
             int result = exec_builtin(cmd->argc, cmd->argv);
+            fflush(stdout);
             if (result == 1) {
                 *exit_flag = 1;
                 exit(EXIT_SUCCESS);
-            }
-            else {
+            } else {
                 exit(result == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
             }
         }
@@ -126,12 +110,66 @@ int exec_commands(Command *cmd_list, int n_cmds, Mode mode, int *exit_flag) {
     return -1;
 }
 
+static int exec_parent_builtin(const Command *cmd) {
+    int saved_stdin = -1;
+    int saved_stdout = -1;
+    int status = -1;
+
+    if (cmd->infile) {
+        saved_stdin = dup(STDIN_FILENO);
+        if (saved_stdin < 0) {
+            perror("dup");
+            goto cleanup;
+        }
+    }
+
+    if (cmd->outfile) {
+        fflush(stdout);
+        saved_stdout = dup(STDOUT_FILENO);
+        if (saved_stdout < 0) {
+            perror("dup");
+            goto cleanup;
+        }
+    }
+
+    if (setup_redirection(cmd) < 0) {
+        goto cleanup;
+    }
+
+    status = exec_builtin(cmd->argc, cmd->argv);
+
+cleanup:
+    if (saved_stdout >= 0) {
+        fflush(stdout);
+    }
+
+    // Restore stdin
+    if (saved_stdin >= 0) {
+        if (dup2(saved_stdin, STDIN_FILENO) < 0) {
+            perror("dup2");
+            status = -1;
+        }
+        close(saved_stdin);
+    }
+
+    // Restore stdout
+    if (saved_stdout >= 0) {
+        if (dup2(saved_stdout, STDOUT_FILENO) < 0) {
+            perror("dup2");
+            status = -1;
+        }
+        close(saved_stdout);
+    }
+
+    return status;
+}
+
 /*
  * Runs built in commands
  * Input: # of args and args list
  * Output: 0 if complete, -1 if error
  */
-static int exec_builtin(int argc, char **argv) {
+static int exec_builtin(int argc, char *const argv[]) {
     if (strcmp(argv[0], "cd") == 0) {
         const char *path = home;
         if (argc == 2) {
@@ -218,6 +256,46 @@ static int find_exec(const char *arg, char **exec_path) {
 
     fprintf(stderr, "find_exec: can not find executable\n");
     return -1;
+}
+
+/*
+ * Sets up input and output redirection.
+ * Returns 0 on success, -1 on failure.
+ */
+static int setup_redirection(const Command *cmd) {
+    if (cmd->infile) {
+        int fd = open(cmd->infile, O_RDONLY);
+        if (fd < 0) {
+            perror(cmd->infile);
+            return -1;
+        }
+
+        if (dup2(fd, STDIN_FILENO) < 0) {
+            perror("dup2");
+            close(fd);
+            return -1;
+        }
+        close(fd);
+    }
+
+    if (cmd->outfile) {
+        int flags = O_WRONLY | O_CREAT | (cmd->append ? O_APPEND : O_TRUNC);
+
+        int fd = open(cmd->outfile, flags, 0640);
+        if (fd < 0) {
+            perror(cmd->outfile);
+            return -1;
+        }
+
+        if (dup2(fd, STDOUT_FILENO) < 0) {
+            perror("dup2");
+            close(fd);
+            return -1;
+        }
+        close(fd);
+    }
+
+    return 0;
 }
 
 /*
