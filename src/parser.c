@@ -85,7 +85,7 @@ int parse_args(char *cmd_buf, Command **cmd_list) {
                 goto error;
             }
             cmds[c].outfile = strdup(tokens[i + 1]);
-            if (cmds[c].infile == NULL) {
+            if (cmds[c].outfile == NULL) {
                 perror("strdup");
                 goto error;
             }

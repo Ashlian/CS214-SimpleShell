@@ -62,7 +62,7 @@ int main(int argc, char const *argv[]) {
         }
         // Execute command
         exec_commands(cmd_list, n_cmds, mode);
-
+        free_cmds(cmd_list, n_cmds);
         continue;
     }
 
