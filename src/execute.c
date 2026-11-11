@@ -184,7 +184,7 @@ static int find_exec(const char *arg, char **exec_path) {
             strcpy(*exec_path, arg);
             return 0;
         }
-        fprintf(stderr, "find_exec: path is not executable");
+        fprintf(stderr, "find_exec: path is not executable\n");
         return -1;
     }
 
@@ -207,7 +207,7 @@ static int find_exec(const char *arg, char **exec_path) {
         }
     }
 
-    fprintf(stderr, "find_exec: can not find executable");
+    fprintf(stderr, "find_exec: can not find executable\n");
     return -1;
 }
 
