@@ -6,7 +6,7 @@ By: Jeffrey Lu (jl3925) & Alexander Wong (amw408)
 # Run Instructions:
 From the project root, run `make` to build and make the program. The executables are placed in the `build directory`. To remove all build outputs, run `make clean`
 
-The program is run directly from the project root through `.build/mysh [file]`
+The program is run directly from the project root through `./build/mysh [file]`
 - When given no arguments, the shell runs with interactive mode, which prints the working directory and intro and ending messages
 - When given a file argument, the shell runs under batch mode, which reads the commands in the file and runs them sequentially
 
