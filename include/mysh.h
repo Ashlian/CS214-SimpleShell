@@ -10,6 +10,7 @@
 #define BUFFER_SIZE 4096
 #define MAX_ARGS 256
 
+extern const char *home;
 typedef enum { INTERACTIVE, BATCH } Mode;
 typedef struct {
     char *argv[MAX_ARGS + 1];
