@@ -5,97 +5,121 @@
  * Input: shell buffer
  * Output: number of commands and the full command list
  */
-int parse_args(char *cmd_buf, Command *cmd_list) {
-    // tokenize with whitespace
-    size_t max = strlen(cmd_buf) / 2 + 1;
-    char **tokens = malloc((max + 1) * sizeof(char *));
+int parse_args(char *cmd_buf, Command **cmd_list) {
+    // Clear command list
+    *cmd_list = NULL;
+
+    // Trim comments before tokenization
+    char *comment = strchr(cmd_buf, '#');
+    if (comment != NULL) {
+        *comment = '\0';
+    }
+
+    // Tokenize with whitespace
+    size_t max_tokens = strlen(cmd_buf) / 2 + 1;
+    int n_tokens = 0;
+    char **tokens = malloc((max_tokens + 1) * sizeof(char *));
     if (!tokens) {
-        perror("token_init failed");
+        perror("token_init");
         free(tokens);
         return -1;
     }
-    int n_tokens = 0;
-    for (char *t = strtok(cmd_buf, " \t\n"); t != NULL; t = strtok(NULL, " \t\n")) {
-        tokens[n_tokens++] = t;
+
+    char *token = strtok(cmd_buf, " \t\n");
+    while (token != NULL) {
+        tokens[n_tokens++] = token;
+        token = strtok(NULL, " \t\n");
     }
+
     if (n_tokens == 0) {
         free(tokens);
         return 0;
     }
     tokens[n_tokens] = NULL;
-    // initialize command list
+
+    // Initialize command list
     int n_cmds = 1;
     for (int i = 0; i < n_tokens; i++) {
         if (strcmp(tokens[i], "|") == 0) {
             n_cmds++;
         }
     }
-    cmd_list = calloc(n_cmds, sizeof(Command));
+
+    Command *cmds = calloc(n_cmds, sizeof(Command));
+    if (!cmds) {
+        free(tokens);
+        return -1;
+    }
 
     int c = 0;
-    for (int i = 0; i < n_tokens - 1; i++) {
+    for (int i = 0; i < n_tokens; i++) {
         char *tok = tokens[i];
         char *star = strchr(tok, '*');
-        // check for pipe "|"
+        // Check for pipe "|"
         if (strcmp(tok, "|") == 0) {
-            if (cmd_list[c].argc == 0) {
-                // syntax error handler
-                goto syntax_error;
+            if (cmds[c].argc == 0) {
+                fprintf(stderr, "mysh: syntax error\n");
+                goto error;
             }
             c++;
             continue;
-        }
-        // check for redirection "<", ">", ">>"
-        else if (strcmp(tok, "<") == 0) {
+        } else if (strcmp(tok, "<") == 0) {
+            // Check for redirection "<", ">", ">>"
             if (tokens[i + 1] == NULL || is_special(tokens[i + 1])) {
-                // syntax error handler
-                goto syntax_error;
+                fprintf(stderr, "mysh: syntax error\n");
+                goto error;
             }
-            cmd_list[c].infile = tokens[i + 1];
+            cmds[c].infile = strdup(tokens[i + 1]);
+            if (cmds[c].infile == NULL) {
+                perror("strdup");
+                goto error;
+            }
             i++;
             continue;
         } else if (strcmp(tok, ">") == 0 || strcmp(tok, ">>") == 0) {
             if (tokens[i + 1] == NULL || is_special(tokens[i + 1])) {
-                // syntax error handler
-                goto syntax_error;
+                fprintf(stderr, "mysh: syntax error\n");
+                goto error;
             }
-            cmd_list[c].outfile = tokens[i + 1];
-            cmd_list[c].append = (strcmp(tok, ">>") == 0);
+            cmds[c].outfile = strdup(tokens[i + 1]);
+            if (cmds[c].infile == NULL) {
+                perror("strdup");
+                goto error;
+            }
+            cmds[c].append = (strcmp(tok, ">>") == 0);
             i++;
             continue;
-        }
-        // check for '*' wildcard
-        else if (star != NULL) {
-            if (expand_wildcards(&cmd_list[c], tok) < 0) {
-                free(tokens);
-                free_cmds(cmd_list, n_cmds);
-                return -1;
+        } else if (star != NULL) {
+            // Check for '*' wildcard
+            if (expand_wildcards(&cmds[c], tok) < 0) {
+                goto error;
             }
-        }
-        // everything else
-        else {
-            if (cmd_list[c].argc >= MAX_ARGS) {
-                goto too_many_args;
+        } else {
+            if (cmds[c].argc >= MAX_ARGS) {
+                fprintf(stderr, "mysh: too many arugments\n");
+                goto error;
             }
-            cmd_list[c].argv[cmd_list[c].argc++] = strdup(tok);
+            char *copy = strdup(tok);
+            if (copy == NULL) {
+                perror("strdup");
+                goto error;
+            }
+            cmds[c].argv[cmds[c].argc++] = copy;
         }
     }
 
-    if (cmd_list[c].argc == 0) {
-        goto syntax_error;
+    if (cmds[c].argc == 0) {
+        fprintf(stderr, "mysh: syntax error\n");
+        goto error;
     }
+
+    free(tokens);
+    *cmd_list = cmds;
     return n_cmds;
 
-syntax_error:
-    fprintf(stderr, "mysh: syntax error\n");
+error:
     free(tokens);
-    free_cmds(cmd_list, n_cmds);
-    return -1;
-
-too_many_args:
-    fprintf(stderr, "mysh: too many arugments\n");
-    free(tokens);
-    free_cmds(cmd_list, n_cmds);
+    free_cmds(cmds, n_cmds);
     return -1;
 }
 
@@ -203,39 +227,23 @@ cleanup:
     return status;
 }
 
-void free_cmds(Command *cmd_list, int n_cmds) {
-    if (cmd_list == NULL) {
+void free_cmds(Command *cmds, int n_cmds) {
+    if (cmds == NULL) {
         return;
     }
 
     for (int c = 0; c < n_cmds; c++) {
-        for (int a = 0; a < cmd_list[c].argc; a++) {
-            free(cmd_list[c].argv[a]);
+        for (int a = 0; a < cmds[c].argc; a++) {
+            free(cmds[c].argv[a]);
         }
+
+        free(cmds[c].infile);
+        free(cmds[c].outfile);
     }
-    free(cmd_list);
+    free(cmds);
 }
 
 int is_special(char *tok) {
     return ((strcmp(tok, "|") == 0) || (strcmp(tok, "<") == 0) || (strcmp(tok, ">") == 0) ||
             (strcmp(tok, ">>") == 0));
-}
-
-/*
- * Checks if a command is built in (needed for redirection vs. basic)
- * Input: argument list
- * Output: 1 if true, 0 if false
- */
-int is_builtin(char **argv) {
-    if (strcmp(argv[0], "cd") == 0) {
-        return 1;
-    } else if (strcmp(argv[0], "pwd") == 0) {
-        return 1;
-    } else if (strcmp(argv[0], "which") == 0) {
-        return 1;
-    } else if (strcmp(argv[0], "exit") == 0) {
-        return 1;
-    } else {
-        return 0;
-    }
 }
