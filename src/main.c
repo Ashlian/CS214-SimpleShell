@@ -6,6 +6,7 @@ static int get_cwd(char *cwd);
 
 int main(int argc, char const *argv[]) {
     int status = 0;
+    int exit_flag = 0;
     int in_fd = STDIN_FILENO;
     InputBuffer input = {0};
     char cmd_buf[BUFFER_SIZE];
@@ -61,8 +62,11 @@ int main(int argc, char const *argv[]) {
             continue;
         }
         // Execute command
-        exec_commands(cmd_list, n_cmds, mode);
+        exec_commands(cmd_list, n_cmds, mode, &exit_flag);
         free_cmds(cmd_list, n_cmds);
+        if (exit_flag) { 
+            break;
+        }
         continue;
     }
 

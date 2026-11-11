@@ -7,12 +7,15 @@ static int is_builtin(char **argv);
 static int find_exec(const char *arg, char **exec_path);
 static int exec_builtin(int argc, char **argv);
 
-int exec_commands(Command *cmd_list, int n_cmds, Mode mode) {
+int exec_commands(Command *cmd_list, int n_cmds, Mode mode, int *exit_flag) {
     Command *cmd = &cmd_list[0];
 
     // Run standalone built-in commands
     if (n_cmds == 1 && is_builtin(cmd->argv) && cmd->infile == NULL && cmd->outfile == NULL) {
-        return exec_builtin(cmd->argc, cmd->argv);
+        int result = exec_builtin(cmd->argc, cmd->argv);
+        if (result == 1) {
+            *exit_flag = 1;
+        }
     }
 
     // Find executable
@@ -79,7 +82,13 @@ int exec_commands(Command *cmd_list, int n_cmds, Mode mode) {
         //! CHECK BUILT IN COMMAND TO RUN BEFORE RUNNING EXECV
         if (is_builtin(cmd->argv)) {
             int result = exec_builtin(cmd->argc, cmd->argv);
-            exit(result == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
+            if (result == 1) {
+                *exit_flag = 1;
+                exit(EXIT_SUCCESS);
+            }
+            else {
+                exit(result == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
+            }
         }
         execv(path, cmd->argv);
         perror("execv");

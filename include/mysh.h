@@ -33,6 +33,6 @@ extern const char *home;
 int read_command(int fd, char *cmd_buf, InputBuffer *input);
 int parse_args(char *cmd_buf, Command **cmd_list);
 void free_cmds(Command *cmds, int n_cmds);
-int exec_commands(Command *cmd_list, int n_cmds, Mode mode);
+int exec_commands(Command *cmd_list, int n_cmds, Mode mode, int *exit_flag);
 
 #endif
