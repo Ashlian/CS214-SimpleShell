@@ -278,7 +278,7 @@ static int exec_builtin(int argc, char *const argv[]) {
 
         free(exec_path);
 
-        if (num_exec != argc - 1) {
+        if (argc == 1 || num_exec != argc - 1) {
             fprintf(stderr, "No executables\n");
             return -1;
         }
