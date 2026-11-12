@@ -44,7 +44,6 @@ int main(int argc, char const *argv[]) {
             char cwd[PATH_MAX];
             if (get_cwd(cwd) < 0) {
                 perror("get_cwd error");
-                status = 1;
                 goto cleanup;
             }
             fprintf(stderr, "%s$ ", cwd);
@@ -53,7 +52,6 @@ int main(int argc, char const *argv[]) {
         int result = read_command(in_fd, cmd_buf, &input);
 
         if (result < 0) {
-            status = 1;
             goto cleanup;
         } else if (result == 0) {
             break; // Done reading file.
